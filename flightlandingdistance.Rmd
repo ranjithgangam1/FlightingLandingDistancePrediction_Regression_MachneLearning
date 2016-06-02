@@ -1,0 +1,236 @@
+---
+title: "Midterm"
+author: "Ranjith Gangam"
+date: "November 27, 2015"
+output: html_document
+---
+
+
+Summary:
+
+This project gives model which explains distance needed for flight landing. 
+Model is   
+Distance = -2528+ 42.54 * speed_ground + 14.28 * height +496.62 * aircaraft.
+It means for one mile increase in speed ground increases landing distance by 14.28 feet provided height and aircarft make are constant. similarly for height and aircraft make.This model fits 85 percent  of given data. 
+
+
+###Reading data
+```{r}
+rm(list=ls())
+Flight_Data_full <- read.csv("D:/MS_documents/Meng/DAM/midterm/Landing.csv",h=T)
+nrow(Flight_Data_full)
+```
+
+###Data preprocessing
+Aircraft type is Qualitative variable. Converting it to indicator variable.
+```{r}
+#creating dummy variable
+Flight_Data_full$aircraft=1*(Flight_Data_full$aircraft=="boeing") 
+
+Flight_Data_full[is.na(Flight_Data_full)] <- 0
+
+Flight_Data <- Flight_Data_full[ which(Flight_Data_full$speed_air> 30),]
+Flight_Data <- Flight_Data[ which(Flight_Data$speed_air<140),]
+cor(Flight_Data$speed_ground,Flight_Data$speed_air)
+```
+
+Filled the air speed with 0, because at missing instance flight is considered to be on ground. So it cannot have air_speed. if speed is less than 30 and greater than 140 they are treated as abnormal therefore they are cleaned. Then we left with 195 observations and correlation between speed ground and air is 99. There is also multicollinearity when speed ground and air are included. So speed ground is considered and it has does not have any missing values. Therefore 781(19 records are removed after data preprocessing) records can be considered and speed air can be ignored for model.
+
+### Visualising  data
+```{r}
+
+plot(Flight_Data)
+library(psych)
+pairs.panels(Flight_Data)
+```
+
+  Pairs panels gives plots with correlation value. From the plot we can see that speed ground and speed air strongly correlated to each other and they are correlated with distance. It means they plan main role in deciding distance when compared to others.  
+
+
+###Limiting dataset to acceptable limits
+```{r}
+
+Flight_Data <- Flight_Data_full[which(Flight_Data_full$duration >40),]
+
+Flight_Data <- Flight_Data[ which(Flight_Data$speed_ground> 30),]
+Flight_Data <- Flight_Data[ which(Flight_Data$speed_ground<140),]
+Flight_Data <- Flight_Data[ which(Flight_Data$height>6),]
+Flight_Data <- Flight_Data[ which(Flight_Data$distance<6000),]
+
+```
+
+Flight Data has records after data cleaning
+
+### Model with ground speed
+```{r}
+Model <- lm(distance ~ speed_ground, data=Flight_Data)
+summary(Model)$coeff
+summary(Model)$r.squared
+summary(Model)$adj.r.squared
+anova(Model)
+```
+
+Model with speed ground has significant t values(greater than 2) for intercept and slope.  Rsquare is 0.75. It also has large F value.  
+
+### Model with data transformation
+There is a little curve in distance and speed ground plot. so here we are checking the necessity of data transformation.
+```{r}
+Model <- lm(log(distance) ~ speed_ground, data=Flight_Data) 
+summary(Model)$coeff
+summary(Model)$r.squared
+summary(Model)$adj.r.squared
+anova(Model)
+```
+
+After transformation R square value went down to 0.71 from 0.75. t values are significant. But transformation did not improve any explanatory power of model.
+
+Adding speed air to model along with ground . first we are preprocessing speed air data.  
+```{r}
+Flight_Data_full[is.na(Flight_Data_full)] <- 0
+
+Flight_Data_air <- Flight_Data_full[ which(Flight_Data_full$speed_air> 30),]
+Flight_Data_air <- Flight_Data_air[ which(Flight_Data_air$speed_air<140),]
+```
+### Model with speed_air and speed_ground
+we know by correlation value  speed ground and air together gives multi collinearity, But it is cross checked here
+```{r}
+cor(Flight_Data_air$speed_ground,Flight_Data_air$speed_air)
+
+Model <- lm(distance ~ speed_ground + speed_air, data=Flight_Data_air)
+summary(Model)
+anova(Model)
+library(car)
+vif(Model)
+
+```
+
+Now multicollinearity issue arised. for same reason t value for speed ground `r summary(Model)$coefficients[2,3]` is small even though F value is large. Finally  VIF confirms this with value of 45. 
+
+
+### Model with speed_ground and height
+```{r}
+cor(Flight_Data$speed_ground,Flight_Data$height)
+
+Model <- lm(distance ~ speed_ground + height, data=Flight_Data)
+
+```
+
+We see that r square value is improved to `r summary(Model)$r.squared`
+```{r}
+summary(Model)$coeff
+summary(Model)$r.squared
+summary(Model)$adj.r.squared
+anova(Model)
+vif(Model)
+```
+
+
+### Model with speed_ground,height,pitch
+```{r}
+cor(Flight_Data$speed_ground,Flight_Data$pitch)
+Model <- lm(distance ~ speed_ground + height + pitch, data=Flight_Data)
+
+```
+
+```{r}
+summary(Model)$coeff
+summary(Model)$r.squared
+summary(Model)$adj.r.squared
+anova(Model)
+vif(Model)
+```
+We see that r square value is improved to `r summary(Model)$r.squared` 
+
+### Model with speed_air,height,aircraft
+
+Here aircraft is added
+```{r}
+cor(Flight_Data$speed_ground,Flight_Data$pitch)
+Model <- lm(distance ~ speed_ground + height+ pitch + aircraft, data=Flight_Data)
+summary(Model)$coeff
+summary(Model)$r.squared
+summary(Model)$adj.r.squared
+anova(Model)
+vif(Model)
+```
+
+We see that r square value is improved to `r summary(Model)$r.squared` and t value is significant for all variables except pitch. t value is less than 2  for pitch .so remove it from model.
+### Model with speed_air,height,aircraft and no of passengers
+
+```{r}
+Model <- lm(distance ~ speed_ground + height + aircraft + no_pasg, data=Flight_Data)
+summary(Model)$coeff
+```
+t value  is less than 2 for number of passengers. therefore it is insignificant.
+
+
+### Model with speed_air,height,aircraft and duration
+```{r}
+Model <- lm(distance ~ speed_ground + height + aircraft + duration, data=Flight_Data)
+summary(Model)$coeff
+
+```
+t value  is less than 2 for duration. therefore it is insignificant.
+
+
+### Model with speed ground, height and aircraft
+```{r}
+Model <- lm(distance ~ speed_ground + height + aircraft, data=Flight_Data)
+
+summary(Model)$coeff
+summary(Model)$r.squared
+summary(Model)$adj.r.squared
+anova(Model)
+vif(Model)
+```
+This model has better r square and adjusted r square. t test value are significant.
+
+```{r}
+plot(Flight_Data$speed_ground,Flight_Data$distance, main=" Actual versus fitted value plot")
+points(Flight_Data$speed_ground,Model$fitted.values,pch=20)
+```
+
+```{r}
+SSRes=sum((Model$residuals)^2)
+SSR = anova(Model)[2,2]+ anova(Model)[1,2] + anova(Model)[3,2]
+
+F0 = summary(Model)$fstatisti[1]
+F=qf(.95, df1=2, df2=777)
+F0
+F
+
+```
+F0 value is greater than F. All coefficients are significant
+ 
+This model has 85% explanatory power. 
+SSRes = 95549081
+SSR =542712178
+SSR gives how much variation of response variable  is explained by model. This value is big when compared to variation not explained in model
+
+
+```{r}
+vif(Model)
+```
+
+VIF value is around one. so no multicollinearity exists  
+
+Final model isDistance = -2528+ 42.54 * speed_ground + 14.28 * height +496.62 * aircaraft.
+
+### Standardising regression coeffipaccent
+To compare which parameter impacts more on distance standardising is done here.
+```{r}
+life_unit_normal1=as.data.frame(apply(Flight_Data,2,function(x){(x-mean(x))/sd(x)}))
+
+Model_unit_normal <- lm(distance ~ speed_ground+height+aircraft, data=life_unit_normal1)
+
+Model_unit_normal$coefficients
+```
+
+By above values speed ground has more impact when compared to others 
+
+Therefore final model is  
+Distance = -2528+ 42.54 * speed_ground + 14.28 * height +496.62 * aircaraft.
+
+It means for one mile increase in speed ground distance is increased by 42.54 feet rovided height and aircraft make are constants.
+similar interpretation for height and aircraft type.
+
